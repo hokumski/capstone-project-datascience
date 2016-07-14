@@ -3,75 +3,189 @@
 
 # Part server.R
 
-suppressWarnings(library(tm))
-suppressWarnings(library(stringr))
-suppressWarnings(library(shiny))
-suppressWarnings(library(ggplot2))
-
-source('serverFunctions.R')
-
-#load('someUnigrams.RData')  #allUnigrams
-load('someBigrams.RData')   #allBigrams
-load('someTrigrams.RData')  #allTrigrams
-load('someFourgrams.RData') #allFourgrams
+library(shiny)
+library(tm)
+library(stringr)
+library(ggplot2)
 
 
-shinyServer(
 
+
+load('someBigrams.RData')
+load('someTrigrams.RData') 
+load('someFourgrams.RData')
+
+
+cleanQuery <- function(string)
+{
     
-    function(input, output) {
-        
-        dataset <- reactive({
-            
-            pred<-predictNextWord(input$userQuery, (input$thresholdPercents/100))
-            pred
-            
-        })
-        
-        output$prediction<-renderPrint({
-            
-            pred<-dataset()
-            
-            highlight<-paste('<u><b>',pred$prediction,'</b></u>')
-            if (pred$prediction=='') {
-                highlight<-'<span style="color:#aaa">???</span>'
-            }
-            
-            HTML(paste('<span style="font-size: 150%;">',input$userQuery,highlight,'</span>'))
-        })
+    string <- iconv(string, "latin1", "ASCII", sub=" ");
+    string <- gsub("[^[:alpha:][:space:][:punct:]]", "", string);
     
-        output$somedebug<-renderPrint({
-            
-            pred<-dataset()
-
-            h<-'<br/><br/>'
-            
-            if (nrow(pred$ngram)>0) {
-                
-                if (pred$depth>0) {
-                    h<-paste(h,'Used for prediction: ',pred$depth,'-grams','<br/>',sep='')
-                }
-            
-                h<-paste(h, 'Found phrases starting with this N-gram:',nrow(pred$ngram),'<br/>')
-            }
-            
-            HTML(h)
-        })
-        
-        output$freqplot<-renderPlot({
-            
-            pred<-dataset()
-            
-            if (nrow(pred$ngram)>0) {
-                
-                plotdata <- pred$ngram
-                plotdata <- head(plotdata[order(plotdata$freq, decreasing=TRUE), ], 10)
-                
-                gp<-ggplot(plotdata, aes(terms, freq))+geom_bar(stat='identity')+labs(x='',y='')+theme(axis.text.x = element_text(angle = 90, hjust = 1, size=14))
-                
-                gp
-            }
-            
-        }, width=400, height=400)
+    # we use same routine like in 'createNGrams' to ensure same method of text preparation
+    corpus <- VCorpus(VectorSource(string))
+    
+    corpus <- tm_map(corpus, content_transformer(tolower))
+    corpus <- tm_map(corpus, stripWhitespace)
+    corpus <- tm_map(corpus, removeNumbers)
+    corpus <- tm_map(corpus, removePunctuation)
+    
+    # take it back from corpus
+    string <- as.character(corpus[[1]])
+    string <- gsub("(^[[:space:]]+|[[:space:]]+$)", "", string)
+    
+    if (is.na(string)) {
+        string <- ''
     }
-)
+    
+    string
+}
+
+
+starts_with <- function(vars, match, ignore.case = TRUE) {
+    if (ignore.case) match <- tolower(match)
+    n <- nchar(match)
+    
+    if (ignore.case) vars <- tolower(vars)
+    substr(vars, 1, n) == match
+}
+
+# if threshold=0, it takes random
+getWord<-function(ngrams, freqThreshold=1) {
+    
+    result<-''
+    
+    if (freqThreshold>1 | freqThreshold<0) {
+        freqThreshold<-1
+    }
+    
+    if (nrow(ngrams)>0) {
+        
+        # take random, if there are some with equal top frequency
+        # if we use freqThreshold, take random from terms with frequency > x*max
+        # this means, if threshold=0.75, take random one from top quarter
+        
+        maxFrequency <- max(ngrams$freq)
+        topResults <- ngrams[ ngrams$freq>=as.integer(maxFrequency*freqThreshold), ] 
+        
+        result<-sample(topResults$terms,1)
+    }
+    
+    result<-word(result,-1)
+}
+
+# todo: return as list
+predictNextWord <- function(string, freqThreshold=1)
+{
+    string <- cleanQuery(string)
+    
+    stringVector <- unlist(strsplit(string, split=' '));
+    queryLength <- length(stringVector);
+    
+    prediction <- ''
+    
+    usedN <- 0
+    usedForChoice<-data.frame()
+    
+    # stage 1. looking for four-grams
+    if (queryLength>=3)
+    {
+        # will search for 4-grams starting with this 3 words:
+        last3Words <- paste(paste(stringVector[(queryLength-2):queryLength], collapse=' '),' ', sep='');
+        
+        searchIndex <- starts_with(allFourgrams$terms, last3Words)
+        foundFourgrams<- allFourgrams[searchIndex, ];
+        prediction<-getWord(foundFourgrams, freqThreshold)
+        
+        usedN <- 4
+        usedForChoice<-foundFourgrams
+        
+    }
+    
+    # stage 2. looking for tri-grams
+    if (queryLength>= 2 & prediction=='')
+    {
+        
+        last2Words <- paste(paste(stringVector[(queryLength-1):queryLength], collapse=' '),' ', sep='');
+        
+        searchIndex <- starts_with(allTrigrams$terms, last2Words)
+        foundTrigrams<- allTrigrams[searchIndex, ];
+        prediction<-getWord(foundTrigrams, freqThreshold)
+        
+        usedN <- 3
+        usedForChoice<-foundTrigrams
+    }
+    
+    # stage 3. looking for bi-grams
+    if (queryLength>= 1 & prediction=='')
+    {
+        lastWord <- paste(stringVector[queryLength],' ',sep='')
+        
+        searchIndex <- starts_with(allBigrams$terms, lastWord)
+        
+        foundBigrams<- allBigrams[searchIndex, ];
+        prediction<-getWord(foundBigrams, freqThreshold)
+        
+        usedN <- 2
+        usedForChoice<-foundBigrams
+    }
+    
+    list(prediction=prediction, depth=usedN, ngram=usedForChoice)
+}
+
+    
+function(input, output) {
+    
+    dataset <- reactive({
+        
+        pred<-predictNextWord(input$userQuery, (input$thresholdPercents/100))
+        pred
+        
+    })
+    
+    output$prediction<-renderPrint({
+        
+        pred<-dataset()
+        
+        highlight<-paste('<u><b>',pred$prediction,'</b></u>')
+        if (pred$prediction=='') {
+            highlight<-'<span style="color:#aaa">???</span>'
+        }
+        
+        HTML(paste('<span style="font-size: 150%;">',input$userQuery,highlight,'</span>'))
+    })
+
+    output$somedebug<-renderPrint({
+        
+        pred<-dataset()
+
+        h<-'<br/><br/>'
+        
+        if (nrow(pred$ngram)>0) {
+            
+            if (pred$depth>0) {
+                h<-paste(h,'Used for prediction: ',pred$depth,'-grams','<br/>',sep='')
+            }
+        
+            h<-paste(h, 'Found phrases starting with this N-gram:',nrow(pred$ngram),'<br/>')
+        }
+        
+        HTML(h)
+    })
+    
+    output$freqplot<-renderPlot({
+        
+        pred<-dataset()
+        
+        if (nrow(pred$ngram)>0) {
+            
+            plotdata <- pred$ngram
+            plotdata <- head(plotdata[order(plotdata$freq, decreasing=TRUE), ], 10)
+            
+            gp<-ggplot(plotdata, aes(terms, freq))+geom_bar(stat='identity')+labs(x='',y='')+theme(axis.text.x = element_text(angle = 90, hjust = 1, size=14))
+            
+            gp
+        }
+        
+    }, width=400, height=400)
+}
