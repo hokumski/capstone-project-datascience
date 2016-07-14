@@ -7,7 +7,7 @@
 # single round of cycle-1 ~ 30 secs
 
 rm(list=ls())
-gc()•
+gc()
 
 if (!file.exists('temp')) {
     dir.create('temp')
@@ -20,24 +20,21 @@ library(RWeka)
 #loading textForCorpus from p.1
 load(file='textForCorpus.RData')
 
-
 #tokenizeUnigram  <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))
 tokenizeBigram   <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
 tokenizeTrigram  <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
 tokenizeFourgram <- function(x) NGramTokenizer(x, Weka_control(min = 4, max = 4))
 
+# processing of text corpus takes a lot of time and resources if corpus is large
+# thanks forums for idea to split text to a big number of chunks and process it separately, then combine together
 
-#processing of text corpus takes a lot of time and resources if corpus is large
-#thanks forums for idea to split text to a big number of chunks and process it separately, then combine together
-
-#it is ok to process in this way, it's like parallel processing
+# it is ok to process in this way, it's like parallel processing
 
 linesInChunk <- 1000
 numberOfIterations <- as.integer( length(textForCorpus) / linesInChunk )
 
 # cycle 1 : creating separate frequency tables and saving to temporary files
-#for (i in 0:numberOfIterations) {
-for (i in 54:numberOfIterations) {
+for (i in 0:numberOfIterations) {
 
     startPosition <- i*linesInChunk+1
     endPosition <- min( (i+1)*linesInChunk, length(textForCorpus) )
@@ -86,6 +83,9 @@ mergeTwoData <- function (data1, data2){
     
     data1 <- data1[order(data1$terms),]
     data2 <- data2[order(data2$terms),]
+    
+    # how it works: if data2 contains terms from data1, freq1<-freq1+freq2
+    # then, add to data1 unique terms from data2 
     
     data1$freq[data1$terms %in% data2$terms] <- data1$freq[data1$terms %in% data2$terms] + data2$freq[data2$terms %in% data1$terms]
 
