@@ -19,8 +19,8 @@ load('someFourgrams.RData')
 cleanQuery <- function(string)
 {
     
-    string <- iconv(string, "latin1", "ASCII", sub=" ");
-    string <- gsub("[^[:alpha:][:space:][:punct:]]", "", string);
+    string <- iconv(string, 'latin1', 'ASCII', sub=' ');
+    string <- gsub('[^[:alpha:][:space:][:punct:]]', '', string);
     
     # we use same routine like in 'createNGrams' to ensure same method of text preparation
     corpus <- VCorpus(VectorSource(string))
@@ -32,7 +32,7 @@ cleanQuery <- function(string)
     
     # take it back from corpus
     string <- as.character(corpus[[1]])
-    string <- gsub("(^[[:space:]]+|[[:space:]]+$)", "", string)
+    string <- gsub('(^[[:space:]]+|[[:space:]]+$)', '', string)
     
     if (is.na(string)) {
         string <- ''
@@ -61,9 +61,9 @@ getWord<-function(ngrams, freqThreshold=1) {
     
     if (nrow(ngrams)>0) {
         
-        # take random, if there are some with equal top frequency
+        # take random, if there are some with equal maximum frequency
         # if we use freqThreshold, take random from terms with frequency > x*max
-        # this means, if threshold=0.75, take random one from top quarter
+        # this means, if threshold=0.75, it takes random one from top quarter
         
         maxFrequency <- max(ngrams$freq)
         topResults <- ngrams[ ngrams$freq>=as.integer(maxFrequency*freqThreshold), ] 
@@ -74,7 +74,7 @@ getWord<-function(ngrams, freqThreshold=1) {
     result<-word(result,-1)
 }
 
-# todo: return as list
+
 predictNextWord <- function(string, freqThreshold=1)
 {
     string <- cleanQuery(string)
@@ -130,6 +130,7 @@ predictNextWord <- function(string, freqThreshold=1)
         usedForChoice<-foundBigrams
     }
     
+    # because need to return not only prediction, but some extras
     list(prediction=prediction, depth=usedN, ngram=usedForChoice)
 }
 
