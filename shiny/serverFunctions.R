@@ -72,8 +72,8 @@ predictNextWord <- function(string, freqThreshold=1)
     
     prediction <- ''
     
-    usedN <- NA
-    usedForChoice<-NA
+    usedN <- 0
+    usedForChoice<-data.frame()
     
     # stage 1. looking for four-grams
     if (queryLength>=3)
@@ -102,7 +102,6 @@ predictNextWord <- function(string, freqThreshold=1)
         
         usedN <- 3
         usedForChoice<-foundTrigrams
-        
     }
     
     # stage 3. looking for bi-grams
@@ -117,8 +116,7 @@ predictNextWord <- function(string, freqThreshold=1)
         
         usedN <- 2
         usedForChoice<-foundBigrams
-        
     }
-    
+       
     list(prediction=prediction, depth=usedN, ngram=usedForChoice)
 }
