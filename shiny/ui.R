@@ -13,7 +13,7 @@ shinyUI(fluidPage(
     sidebarLayout(
         
         sidebarPanel(
-            textInput('userQuery', 'Say something?)',value = ''),
+            textInput('userQuery', 'Say something?',value = ''),
             sliderInput('thresholdPercents', label='Freq.threshold', min = 1, max=100,value = 90)
         ),
         

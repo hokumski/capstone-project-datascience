@@ -184,7 +184,7 @@ function(input, output) {
             plotdata$threshold <- plotdata$freq >= thresholdLevel
             plotdata$threshold <- factor( plotdata$threshold, levels=c(T,F) )
             
-            gp<-ggplot(plotdata, aes(terms, freq))+geom_bar(stat='identity', aes(fill=threshold))+labs(x='',y='')+theme(axis.text.x = element_text(angle = 90, hjust = 1, size=14))+scale_fill_manual(labels=c('above','below'), values=c('#669966','#999999'))+geom_hline(yintercept = thresholdLevel, color='red')
+            gp<-ggplot(plotdata, aes(terms, freq))+geom_hline(yintercept = thresholdLevel, color='red')+geom_bar(stat='identity', aes(fill=threshold))+labs(x='',y='')+theme(axis.text.x = element_text(angle = 90, hjust = 1, size=14))+scale_fill_manual(labels=c('above','below'), values=c('#669966','#999999'))
             
             gp
         }
