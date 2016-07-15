@@ -7,7 +7,7 @@ library(shiny)
 library(tm)
 library(stringr)
 library(ggplot2)
-
+library(RColorBrewer)
 
 
 
@@ -131,7 +131,7 @@ predictNextWord <- function(string, freqThreshold=1)
     }
     
     # because need to return not only prediction, but some extras
-    list(prediction=prediction, depth=usedN, ngram=usedForChoice)
+    list(prediction=prediction, depth=usedN, ngram=usedForChoice, threshold=freqThreshold)
 }
 
     
@@ -163,12 +163,8 @@ function(input, output) {
         h<-'<br/><br/>'
         
         if (nrow(pred$ngram)>0) {
-            
-            if (pred$depth>0) {
-                h<-paste(h,'Used for prediction: ',pred$depth,'-grams','<br/>',sep='')
-            }
         
-            h<-paste(h, 'Found phrases starting with this N-gram:',nrow(pred$ngram),'<br/>')
+            h<-paste(h, 'Found phrases starting with <b>',pred$depth,'-gram</b>:',nrow(pred$ngram),'<br/>',sep='')
         }
         
         HTML(h)
@@ -183,7 +179,12 @@ function(input, output) {
             plotdata <- pred$ngram
             plotdata <- head(plotdata[order(plotdata$freq, decreasing=TRUE), ], 10)
             
-            gp<-ggplot(plotdata, aes(terms, freq))+geom_bar(stat='identity')+labs(x='',y='')+theme(axis.text.x = element_text(angle = 90, hjust = 1, size=14))
+            thresholdLevel <- max(plotdata$freq) * pred$threshold
+                
+            plotdata$threshold <- plotdata$freq >= thresholdLevel
+            plotdata$threshold <- factor( plotdata$threshold, levels=c(T,F) )
+            
+            gp<-ggplot(plotdata, aes(terms, freq))+geom_bar(stat='identity', aes(fill=threshold))+labs(x='',y='')+theme(axis.text.x = element_text(angle = 90, hjust = 1, size=14))+scale_fill_manual(labels=c('above','below'), values=c('#669966','#999999'))+geom_hline(yintercept = thresholdLevel, color='red')
             
             gp
         }
